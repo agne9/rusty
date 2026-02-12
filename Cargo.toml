@@ -1,0 +1,21 @@
+[package]
+name = "rust_bot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# The async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Discord libraries 
+twilight-gateway = "0.17"
+twilight-http = "0.17"
+twilight-model = "0.17"
+
+# For handling environment variables 
+dotenvy = "0.15"
+
+# Useful for error handling
+anyhow = "1.0"
+
+rustls = { version = "0.23", features = ["ring"] }
