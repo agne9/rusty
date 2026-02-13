@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use tokio::time::{Duration, sleep};
 use twilight_http::Client;
 use twilight_model::{
     gateway::payload::incoming::MessageCreate,
@@ -44,6 +45,7 @@ pub async fn run(
     };
 
     let amount = requested.min(MAX_PURGE);
+    let delete_count = amount.saturating_add(1).min(MAX_PURGE);
 
     if let Some(p) = msg.member.as_ref().and_then(|m| m.permissions) {
         let user_has_manage_messages =
@@ -59,7 +61,7 @@ pub async fn run(
 
     let messages = http
         .channel_messages(msg.channel_id)
-        .limit(amount)
+        .limit(delete_count)
         .await?
         .model()
         .await?;
@@ -87,9 +89,17 @@ pub async fn run(
     }
 
     let confirmation = format!("Purged {} message(s).", amount);
-    http.create_message(msg.channel_id)
+    let confirmation_message = http
+        .create_message(msg.channel_id)
         .content(&confirmation)
+        .await?
+        .model()
         .await?;
+
+    sleep(Duration::from_secs(3)).await;
+    let _ = http
+        .delete_message(msg.channel_id, confirmation_message.id)
+        .await;
 
     Ok(())
 }
