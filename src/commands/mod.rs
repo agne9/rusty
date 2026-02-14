@@ -45,6 +45,7 @@ pub const COMMANDS: &[CommandMeta] = &[
     utility::ping::META,
     utility::universe::META,
     utility::help::META,
+    utility::usage::META,
     utility::pagetest::META,
     moderation::purge::META,
     moderation::permissions::META,
@@ -72,6 +73,7 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
         "ping" => utility::ping::run(http, msg).await?,
         "universe" => utility::universe::run(http, msg).await?,
         "help" => utility::help::run(http, msg, arg1).await?,
+        "usage" => utility::usage::run(http, msg, arg1).await?,
         "pagetest" => utility::pagetest::run(http, msg, arg1).await?,
 
         "permissions" => moderation::permissions::run(http, msg, arg1).await?,

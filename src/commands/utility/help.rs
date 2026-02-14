@@ -314,7 +314,6 @@ fn grouped_help_description(commands: &[&CommandMeta]) -> String {
         }
 
         out.push_str(&format!("`{}`: {}\n", command.name, command.desc));
-        out.push_str(&format!("Usage: `{}`\n", command.usage));
     }
 
     if out.is_empty() {
