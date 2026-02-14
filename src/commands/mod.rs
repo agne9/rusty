@@ -1,12 +1,13 @@
 pub mod moderation;
 pub mod utility;
 
-use std::sync::Arc;
-use twilight_http::Client;
 use twilight_model::{
     application::interaction::InteractionData,
     gateway::payload::incoming::{InteractionCreate, MessageCreate},
 };
+
+use crate::context::Context;
+use crate::util::COMMAND_PREFIX;
 
 #[derive(Clone, Copy)]
 enum InteractionRoute {
@@ -59,9 +60,7 @@ pub const COMMANDS: &[CommandMeta] = &[
     // Add new commands here
 ];
 
-const PREFIX: char = '!'; // Command Prefix Character
-
-pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyhow::Result<()> {
+pub async fn handle_message(ctx: Context, msg: Box<MessageCreate>) -> anyhow::Result<()> {
     if msg.author.bot {
         return Ok(());
     }
@@ -69,11 +68,11 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
     let content_owned = msg.content.clone();
     let content = content_owned.trim();
 
-    if !content.starts_with(PREFIX) {
+    if !content.starts_with(COMMAND_PREFIX) {
         return Ok(());
     }
 
-    let content = content.trim_start_matches(PREFIX).trim();
+    let content = content.trim_start_matches(COMMAND_PREFIX).trim();
     let mut command_and_rest = content.splitn(2, char::is_whitespace);
     let cmd = command_and_rest.next().unwrap_or("").to_ascii_lowercase();
     let rest = command_and_rest
@@ -103,21 +102,21 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
     let arg_tail = arg_tail.as_deref();
 
     match cmd.as_str() {
-        "ping" => utility::ping::run(http, msg).await?,
-        "universe" => utility::universe::run(http, msg).await?,
-        "help" => utility::help::run(http, msg, arg1).await?,
-        "usage" => utility::usage::run(http, msg, arg1).await?,
-        "pagetest" => utility::pagetest::run(http, msg, arg1).await?,
+        "ping" => utility::ping::run(ctx.clone(), msg).await?,
+        "universe" => utility::universe::run(ctx.clone(), msg).await?,
+        "help" => utility::help::run(ctx.clone(), msg, arg1).await?,
+        "usage" => utility::usage::run(ctx.clone(), msg, arg1).await?,
+        "pagetest" => utility::pagetest::run(ctx.clone(), msg, arg1).await?,
 
-        "ban" => moderation::ban::run(http, msg, arg1, arg_tail).await?,
-        "unban" => moderation::unban::run(http, msg, arg1, arg_tail).await?,
-        "kick" => moderation::kick::run(http, msg, arg1, arg_tail).await?,
-        "timeout" => moderation::timeout::run(http, msg, arg1, arg_tail).await?,
-        "untimeout" => moderation::untimeout::run(http, msg, arg1, arg_tail).await?,
-        "warn" => moderation::warn::run(http, msg, arg1, arg_tail).await?,
-        "warnings" => moderation::warnings::run(http, msg, arg1, arg_tail).await?,
-        "permissions" => moderation::permissions::run(http, msg, arg1).await?,
-        "purge" => moderation::purge::run(http, msg, arg1).await?,
+        "ban" => moderation::ban::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "unban" => moderation::unban::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "kick" => moderation::kick::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "timeout" => moderation::timeout::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "untimeout" => moderation::untimeout::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "warn" => moderation::warn::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "warnings" => moderation::warnings::run(ctx.clone(), msg, arg1, arg_tail).await?,
+        "permissions" => moderation::permissions::run(ctx.clone(), msg, arg1).await?,
+        "purge" => moderation::purge::run(ctx.clone(), msg, arg1).await?,
         // Add new commands here
         _ => {}
     }
@@ -126,7 +125,7 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
 }
 
 pub async fn handle_interaction(
-    http: Arc<Client>,
+    ctx: Context,
     interaction: Box<InteractionCreate>,
 ) -> anyhow::Result<()> {
     let custom_id = match interaction.data.as_ref() {
@@ -142,27 +141,33 @@ pub async fn handle_interaction(
     match route {
         InteractionRoute::PermissionsButtons => {
             let _handled =
-                moderation::permissions::handle_pagination_interaction(http, interaction).await?;
+                moderation::permissions::handle_pagination_interaction(ctx.clone(), interaction)
+                    .await?;
         }
         InteractionRoute::HelpButtons => {
-            let _handled = utility::help::handle_pagination_interaction(http, interaction).await?;
+            let _handled =
+                utility::help::handle_pagination_interaction(ctx.clone(), interaction).await?;
         }
         InteractionRoute::PagetestButtons => {
             let _handled =
-                utility::pagetest::handle_pagination_interaction(http, interaction).await?;
+                utility::pagetest::handle_pagination_interaction(ctx.clone(), interaction).await?;
         }
         InteractionRoute::PermissionsModal => {
-            let _handled =
-                moderation::permissions::handle_pagination_modal_interaction(http, interaction)
-                    .await?;
+            let _handled = moderation::permissions::handle_pagination_modal_interaction(
+                ctx.clone(),
+                interaction,
+            )
+            .await?;
         }
         InteractionRoute::HelpModal => {
             let _handled =
-                utility::help::handle_pagination_modal_interaction(http, interaction).await?;
+                utility::help::handle_pagination_modal_interaction(ctx.clone(), interaction)
+                    .await?;
         }
         InteractionRoute::PagetestModal => {
             let _handled =
-                utility::pagetest::handle_pagination_modal_interaction(http, interaction).await?;
+                utility::pagetest::handle_pagination_modal_interaction(ctx.clone(), interaction)
+                    .await?;
         }
     }
 

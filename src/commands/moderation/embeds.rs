@@ -2,6 +2,7 @@ use twilight_http::Client;
 use twilight_model::{channel::message::embed::Embed, id::Id, id::marker::UserMarker};
 use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, ImageSource};
 
+use crate::database::warnings::WarningEntry;
 use crate::util::embed::DEFAULT_EMBED_COLOR;
 
 /// Build a moderation action-result embed.
@@ -98,4 +99,65 @@ pub fn moderation_action_embed(
     };
 
     Ok(builder.validate()?.build())
+}
+
+pub fn usage_message(usage: &str) -> String {
+    format!("Usage: `{usage}`")
+}
+
+pub fn guild_only_message() -> &'static str {
+    "This command only works in servers."
+}
+
+pub fn permission_denied_message() -> &'static str {
+    "You are not permitted to use this command."
+}
+
+pub fn warnings_window_label_days(days: u64) -> String {
+    format!("last {} day(s)", days)
+}
+
+pub fn warnings_overview_embed(
+    target_profile: &TargetProfile,
+    window_label: &str,
+    entries: &[WarningEntry],
+) -> anyhow::Result<Embed> {
+    let count = entries.len();
+    let mut description = format!("Total warnings in {}: **{}**\n\n", window_label, count);
+
+    if entries.is_empty() {
+        description.push_str("No warnings in this period.");
+    } else {
+        let start = entries.len().saturating_sub(5);
+        for (index, entry) in entries.iter().enumerate().skip(start) {
+            let line = format!(
+                "#{idx} • <t:{ts}:F> • by <@{mod_id}>\nReason: {reason}\n\n",
+                idx = index + 1,
+                ts = entry.warned_at,
+                mod_id = entry.moderator_id,
+                reason = sanitize_reason(&entry.reason)
+            );
+            description.push_str(&line);
+        }
+    }
+
+    let title = format!("Warnings for {}", target_profile.display_name);
+    let builder = EmbedBuilder::new()
+        .color(DEFAULT_EMBED_COLOR)
+        .description(description);
+
+    let builder = match target_profile.avatar_url.as_deref() {
+        Some(url) => {
+            let icon = ImageSource::url(url.to_owned())?;
+            let author = EmbedAuthorBuilder::new(title).icon_url(icon).build();
+            builder.author(author)
+        }
+        None => builder.title(title),
+    };
+
+    Ok(builder.validate()?.build())
+}
+
+fn sanitize_reason(reason: &str) -> String {
+    reason.replace('@', "@\u{200B}")
 }

@@ -1,8 +1,7 @@
-use std::sync::Arc;
-use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
 use crate::commands::CommandMeta;
+use crate::context::Context;
 
 pub const META: CommandMeta = CommandMeta {
     name: "ping",
@@ -11,7 +10,9 @@ pub const META: CommandMeta = CommandMeta {
     usage: "!ping",
 };
 
-pub async fn run(http: Arc<Client>, msg: Box<MessageCreate>) -> anyhow::Result<()> {
+/// Send a simple connectivity response.
+pub async fn run(ctx: Context, msg: Box<MessageCreate>) -> anyhow::Result<()> {
+    let http = &ctx.http;
     http.create_message(msg.channel_id).content("Pong!").await?;
 
     Ok(())

@@ -5,7 +5,6 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use twilight_model::id::{Id, marker::UserMarker};
 
 #[derive(Clone, Debug)]
 pub struct WarningEntry {
@@ -26,21 +25,17 @@ fn warning_store() -> &'static RwLock<HashMap<u64, Vec<WarningEntry>>> {
 }
 
 /// Record a warning for a target user and return the new warning number.
-pub async fn record_warning(
-    user_id: Id<UserMarker>,
-    moderator_id: Id<UserMarker>,
-    reason: &str,
-) -> WarningRecord {
+pub async fn record_warning(user_id: u64, moderator_id: u64, reason: &str) -> WarningRecord {
     let warned_at = now_unix_secs();
 
     let entry = WarningEntry {
         warned_at,
-        moderator_id: moderator_id.get(),
+        moderator_id,
         reason: reason.to_owned(),
     };
 
     let mut store = warning_store().write().await;
-    let entries = store.entry(user_id.get()).or_default();
+    let entries = store.entry(user_id).or_default();
     entries.push(entry);
 
     WarningRecord {
@@ -49,10 +44,10 @@ pub async fn record_warning(
 }
 
 /// Return warning entries for a target user in the inclusive [since, now] range.
-pub async fn warnings_since(user_id: Id<UserMarker>, since: u64) -> Vec<WarningEntry> {
+pub async fn warnings_since(user_id: u64, since: u64) -> Vec<WarningEntry> {
     let store = warning_store().read().await;
     let mut entries = store
-        .get(&user_id.get())
+        .get(&user_id)
         .cloned()
         .unwrap_or_default()
         .into_iter()

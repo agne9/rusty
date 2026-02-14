@@ -1,5 +1,5 @@
 pub mod ban;
-pub mod embeds;
+mod embeds;
 pub mod kick;
 pub mod permissions;
 pub mod purge;

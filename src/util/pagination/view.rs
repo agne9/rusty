@@ -56,6 +56,9 @@ pub fn build_paginated_view(
 }
 
 /// Build a paginated embed + navigation controls with an optional footer note.
+// Clippy note: this API mirrors pagination state fields passed from command handlers.
+// Keeping arguments explicit here avoids temporary structs at every call site.
+#[allow(clippy::too_many_arguments)]
 pub fn build_paginated_view_with_footer_note(
     command: &str,
     title: &str,

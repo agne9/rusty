@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, MessageCreate};
 
 use crate::commands::CommandMeta;
+use crate::context::Context;
 use crate::util::pagination::{
     DEFAULT_TIMEOUT_SECS, PaginationInteractionValidation, PaginationModalSubmitValidation,
     build_paginated_list_view, clamp_page, open_jump_modal_from_token, parse_one_based_page,
@@ -34,11 +34,8 @@ const ITEMS_PER_PAGE: usize = 5;
 /// Error behavior:
 /// - returns usage text on invalid page input.
 /// - returns bounds text when the requested page is out of range.
-pub async fn run(
-    http: Arc<Client>,
-    msg: Box<MessageCreate>,
-    arg1: Option<&str>,
-) -> anyhow::Result<()> {
+pub async fn run(ctx: Context, msg: Box<MessageCreate>, arg1: Option<&str>) -> anyhow::Result<()> {
+    let http = &ctx.http;
     let items = build_test_items();
     let total = total_pages(items.len(), ITEMS_PER_PAGE);
 
@@ -68,7 +65,7 @@ pub async fn run(
     )?;
 
     send_paginated_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         msg.channel_id,
         embed,
         components,
@@ -82,11 +79,12 @@ pub async fn run(
 
 /// Handle pagination button presses for the temporary `pagetest` command.
 pub async fn handle_pagination_interaction(
-    http: Arc<Client>,
+    ctx: Context,
     interaction: Box<InteractionCreate>,
 ) -> anyhow::Result<bool> {
+    let http = &ctx.http;
     let (actor_id, token) =
-        match validate_interaction_for_command(&http, &interaction, "pagetest").await? {
+        match validate_interaction_for_command(http, &interaction, "pagetest").await? {
             PaginationInteractionValidation::NotForCommand => return Ok(false),
             PaginationInteractionValidation::HandledInvalid => return Ok(true),
             PaginationInteractionValidation::Valid {
@@ -99,7 +97,7 @@ pub async fn handle_pagination_interaction(
     let total = total_pages(items.len(), ITEMS_PER_PAGE);
 
     if token.action == "jump" {
-        open_jump_modal_from_token(&http, &interaction, &token, total).await?;
+        open_jump_modal_from_token(http, &interaction, &token, total).await?;
         return Ok(true);
     }
 
@@ -116,7 +114,7 @@ pub async fn handle_pagination_interaction(
     )?;
 
     update_paginated_interaction_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         &interaction,
         embed,
         components,
@@ -130,11 +128,12 @@ pub async fn handle_pagination_interaction(
 
 /// Handle jump-modal submit interactions for the temporary `pagetest` command.
 pub async fn handle_pagination_modal_interaction(
-    http: Arc<Client>,
+    ctx: Context,
     interaction: Box<InteractionCreate>,
 ) -> anyhow::Result<bool> {
+    let http = &ctx.http;
     let (actor_id, entered_page, total_pages_hint) =
-        match validate_jump_modal_for_command(&http, &interaction, "pagetest").await? {
+        match validate_jump_modal_for_command(http, &interaction, "pagetest").await? {
             PaginationModalSubmitValidation::NotForCommand => return Ok(false),
             PaginationModalSubmitValidation::HandledInvalid => return Ok(true),
             PaginationModalSubmitValidation::Valid {
@@ -160,7 +159,7 @@ pub async fn handle_pagination_modal_interaction(
     )?;
 
     update_paginated_interaction_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         &interaction,
         embed,
         components,

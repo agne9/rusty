@@ -1,8 +1,12 @@
 use std::sync::Arc;
-use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, MessageCreate};
 
+use crate::commands::utility::embeds::{
+    grouped_help_description, no_commands_message, page_out_of_range_message,
+    unknown_category_message,
+};
 use crate::commands::{COMMANDS, CommandMeta};
+use crate::context::Context;
 use crate::util::pagination::{
     DEFAULT_TIMEOUT_SECS, PaginationInteractionValidation, PaginationModalSubmitValidation,
     build_paginated_view, build_paginated_view_with_footer_note, clamp_page,
@@ -20,11 +24,9 @@ pub const META: CommandMeta = CommandMeta {
 
 const HELP_COMMANDS_PER_PAGE: usize = 20;
 
-pub async fn run(
-    http: Arc<Client>,
-    msg: Box<MessageCreate>,
-    arg1: Option<&str>,
-) -> anyhow::Result<()> {
+/// Render the command catalog, optionally filtered by category or page.
+pub async fn run(ctx: Context, msg: Box<MessageCreate>, arg1: Option<&str>) -> anyhow::Result<()> {
+    let http = &ctx.http;
     let parsed_page = arg1.and_then(|raw| raw.parse::<usize>().ok().filter(|page| *page >= 1));
     let category = match (arg1, parsed_page) {
         (Some(raw), None) => Some(raw),
@@ -36,32 +38,16 @@ pub async fn run(
     categories.dedup();
 
     if let Some(wanted_category) = category
-        && !categories
-            .iter()
-            .any(|known_category| *known_category == wanted_category)
+        && !categories.contains(&wanted_category)
     {
-        let valid = categories
-            .iter()
-            .map(|category| display_category(category))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let out = format!(
-            "Unknown category: {}\nValid categories: {}",
-            display_category(wanted_category),
-            valid
-        );
+        let out = unknown_category_message(wanted_category, &categories);
         http.create_message(msg.channel_id).content(&out).await?;
         return Ok(());
     }
 
     let commands = sorted_commands(category);
     if commands.is_empty() {
-        let out = match category {
-            Some(cat) => format!("No commands found in category: {}", display_category(cat)),
-            None => {
-                "No commands found at all. (This probably means something is broken)".to_owned()
-            }
-        };
+        let out = no_commands_message(category);
         http.create_message(msg.channel_id).content(&out).await?;
         return Ok(());
     }
@@ -70,10 +56,7 @@ pub async fn run(
     let total = total_pages(commands.len(), HELP_COMMANDS_PER_PAGE);
 
     if requested_page > total {
-        let out = format!(
-            "Page {} does not exist. Available pages: 1-{}.",
-            requested_page, total
-        );
+        let out = page_out_of_range_message(requested_page, total);
         http.create_message(msg.channel_id).content(&out).await?;
         return Ok(());
     }
@@ -107,7 +90,7 @@ pub async fn run(
     };
 
     send_paginated_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         msg.channel_id,
         embed,
         components,
@@ -121,11 +104,12 @@ pub async fn run(
 
 /// Handle pagination button presses for the `help` command.
 pub async fn handle_pagination_interaction(
-    http: Arc<Client>,
+    ctx: Context,
     interaction: Box<InteractionCreate>,
 ) -> anyhow::Result<bool> {
+    let http = &ctx.http;
     let (actor_id, token) =
-        match validate_interaction_for_command_prefix(&http, &interaction, "help").await? {
+        match validate_interaction_for_command_prefix(http, &interaction, "help").await? {
             PaginationInteractionValidation::NotForCommand => return Ok(false),
             PaginationInteractionValidation::HandledInvalid => return Ok(true),
             PaginationInteractionValidation::Valid {
@@ -143,7 +127,7 @@ pub async fn handle_pagination_interaction(
     let total = total_pages(commands.len(), HELP_COMMANDS_PER_PAGE);
 
     if token.action == "jump" {
-        open_jump_modal_from_token(&http, &interaction, &token, total).await?;
+        open_jump_modal_from_token(http, &interaction, &token, total).await?;
         return Ok(true);
     }
 
@@ -177,7 +161,7 @@ pub async fn handle_pagination_interaction(
     };
 
     update_paginated_interaction_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         &interaction,
         embed,
         components,
@@ -191,11 +175,12 @@ pub async fn handle_pagination_interaction(
 
 /// Handle jump-modal submit interactions for the `help` command.
 pub async fn handle_pagination_modal_interaction(
-    http: Arc<Client>,
+    ctx: Context,
     interaction: Box<InteractionCreate>,
 ) -> anyhow::Result<bool> {
+    let http = &ctx.http;
     let (actor_id, command, entered_page, total_pages_hint) =
-        match validate_jump_modal_for_command_prefix(&http, &interaction, "help").await? {
+        match validate_jump_modal_for_command_prefix(http, &interaction, "help").await? {
             PaginationModalSubmitValidation::NotForCommand => return Ok(false),
             PaginationModalSubmitValidation::HandledInvalid => return Ok(true),
             PaginationModalSubmitValidation::Valid {
@@ -243,7 +228,7 @@ pub async fn handle_pagination_modal_interaction(
     };
 
     update_paginated_interaction_message(
-        Arc::clone(&http),
+        Arc::clone(&ctx.http),
         &interaction,
         embed,
         components,
@@ -274,14 +259,6 @@ fn help_footer_note() -> Option<String> {
     None
 }
 
-fn display_category(category: &str) -> String {
-    let mut chars = category.chars();
-    match chars.next() {
-        Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
-        None => String::new(),
-    }
-}
-
 fn sorted_commands(category: Option<&str>) -> Vec<&'static CommandMeta> {
     let mut filtered: Vec<&'static CommandMeta> = COMMANDS
         .iter()
@@ -298,27 +275,4 @@ fn sorted_commands(category: Option<&str>) -> Vec<&'static CommandMeta> {
     });
 
     filtered
-}
-
-fn grouped_help_description(commands: &[&CommandMeta]) -> String {
-    let mut out = String::new();
-    let mut current_category: Option<&str> = None;
-
-    for command in commands {
-        if current_category != Some(command.category) {
-            if !out.is_empty() {
-                out.push('\n');
-            }
-            out.push_str(&format!("**{}**\n", display_category(command.category)));
-            current_category = Some(command.category);
-        }
-
-        out.push_str(&format!("`{}`: {}\n", command.name, command.desc));
-    }
-
-    if out.is_empty() {
-        out.push_str("No commands available.");
-    }
-
-    out.trim_end().to_owned()
 }

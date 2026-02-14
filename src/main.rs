@@ -1,6 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
+use tracing::{error, info};
 use twilight_gateway::{EventTypeFlags, Intents, Shard, ShardId, StreamExt as _};
 use twilight_http::Client;
 use twilight_model::gateway::event::Event;
@@ -8,14 +9,19 @@ use twilight_model::gateway::event::Event;
 use rustls::crypto::ring::default_provider;
 
 mod commands;
+mod context;
 mod database;
 mod util;
 
+use crate::context::Context;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
     default_provider()
         .install_default()
-        .expect("failed to install rustls ring provider");
+        .map_err(|_| anyhow::anyhow!("failed to install rustls ring provider"))?;
 
     // Load the .env file
     dotenvy::dotenv().ok();
@@ -25,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create a single shared HTTP Client
     let http = Arc::new(Client::new(token.clone()));
+    let ctx = Context::new(Arc::clone(&http));
 
     // Declare which intents the bot has
     let intents = Intents::GUILDS | Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT;
@@ -33,25 +40,28 @@ async fn main() -> anyhow::Result<()> {
     // Declare how many shards we want to be running and input our token and intents
     let mut shard = Shard::new(ShardId::new(0, 1), token, intents);
 
-    println!("Rusty is connecting...");
+    info!("Rusty is connecting...");
 
     // Our ears, listens for stuff to do
     while let Some(item) = shard.next_event(EventTypeFlags::all()).await {
         let event = match item {
             Ok(event) => event,
-            Err(_) => continue,
+            Err(source) => {
+                error!(?source, "gateway event stream error");
+                continue;
+            }
         };
 
         match event {
             Event::Ready(_) => {
-                println!("Rusty has successfully awoken!");
+                info!("Rusty has successfully awoken!");
             }
 
             Event::MessageCreate(msg) => {
-                commands::handle_message(Arc::clone(&http), msg).await?;
+                commands::handle_message(ctx.clone(), msg).await?;
             }
             Event::InteractionCreate(interaction) => {
-                commands::handle_interaction(Arc::clone(&http), interaction).await?;
+                commands::handle_interaction(ctx.clone(), interaction).await?;
             }
             _ => {} // Ignore unused events
         }

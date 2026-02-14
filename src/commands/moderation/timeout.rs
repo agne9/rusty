@@ -1,9 +1,6 @@
-use std::{
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use twilight_http::Client;
+use tracing::error;
 use twilight_http::request::AuditLogReason as _;
 use twilight_model::{
     gateway::payload::incoming::MessageCreate, guild::Permissions, util::Timestamp,
@@ -11,6 +8,7 @@ use twilight_model::{
 
 use crate::commands::CommandMeta;
 use crate::commands::moderation::embeds::{fetch_target_profile, moderation_action_embed};
+use crate::context::Context;
 use crate::util::parse::{parse_duration_seconds, parse_target_user_id};
 use crate::util::permissions::has_message_permission;
 
@@ -23,12 +21,14 @@ pub const META: CommandMeta = CommandMeta {
 
 const DEFAULT_TIMEOUT_SECS: u64 = 10 * 60;
 
+/// Apply a temporary communication timeout to a target user.
 pub async fn run(
-    http: Arc<Client>,
+    ctx: Context,
     msg: Box<MessageCreate>,
     arg1: Option<&str>,
     arg_tail: Option<&str>,
 ) -> anyhow::Result<()> {
+    let http = &ctx.http;
     let Some(guild_id) = msg.guild_id else {
         http.create_message(msg.channel_id)
             .content("This command only works in servers.")
@@ -36,7 +36,7 @@ pub async fn run(
         return Ok(());
     };
 
-    if !has_message_permission(&http, &msg, Permissions::MODERATE_MEMBERS).await? {
+    if !has_message_permission(http, &msg, Permissions::MODERATE_MEMBERS).await? {
         http.create_message(msg.channel_id)
             .content("You are not permitted to use this command.")
             .await?;
@@ -99,14 +99,15 @@ pub async fn run(
         request = request.reason(reason);
     }
 
-    if request.await.is_err() {
+    if let Err(source) = request.await {
+        error!(?source, "timeout request failed");
         http.create_message(msg.channel_id)
             .content("I couldn't timeout that user. Check role hierarchy and permissions.")
             .await?;
         return Ok(());
     }
 
-    let target_profile = fetch_target_profile(&http, target_user_id).await;
+    let target_profile = fetch_target_profile(http, target_user_id).await;
     let embed = moderation_action_embed(
         &target_profile,
         target_user_id,

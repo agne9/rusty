@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
-use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::MessageCreate;
 
 use crate::commands::{COMMANDS, CommandMeta};
+use crate::context::Context;
 
 pub const META: CommandMeta = CommandMeta {
     name: "usage",
@@ -23,11 +21,8 @@ pub const META: CommandMeta = CommandMeta {
 /// Error behavior:
 /// - missing argument returns this command's usage.
 /// - unknown command returns a short not-found message.
-pub async fn run(
-    http: Arc<Client>,
-    msg: Box<MessageCreate>,
-    arg1: Option<&str>,
-) -> anyhow::Result<()> {
+pub async fn run(ctx: Context, msg: Box<MessageCreate>, arg1: Option<&str>) -> anyhow::Result<()> {
+    let http = &ctx.http;
     let Some(raw_name) = arg1 else {
         let usage = format!("Usage: `{}`", META.usage);
         http.create_message(msg.channel_id).content(&usage).await?;

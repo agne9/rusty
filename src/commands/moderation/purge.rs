@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use tokio::time::{Duration, sleep};
-use twilight_http::Client;
+use tracing::error;
 use twilight_model::{
     gateway::payload::incoming::MessageCreate,
     guild::Permissions,
@@ -9,6 +7,8 @@ use twilight_model::{
 };
 
 use crate::commands::CommandMeta;
+use crate::context::Context;
+use crate::util::permissions::has_message_permission;
 
 pub const META: CommandMeta = CommandMeta {
     name: "purge",
@@ -19,11 +19,9 @@ pub const META: CommandMeta = CommandMeta {
 
 const MAX_PURGE: u16 = 100;
 
-pub async fn run(
-    http: Arc<Client>,
-    msg: Box<MessageCreate>,
-    arg1: Option<&str>,
-) -> anyhow::Result<()> {
+/// Delete a bounded number of recent channel messages.
+pub async fn run(ctx: Context, msg: Box<MessageCreate>, arg1: Option<&str>) -> anyhow::Result<()> {
+    let http = &ctx.http;
     let Some(requested_raw) = arg1 else {
         let usage = format!("Usage: `{}`", META.usage);
         http.create_message(msg.channel_id).content(&usage).await?;
@@ -47,16 +45,11 @@ pub async fn run(
     let amount = requested.min(MAX_PURGE);
     let delete_count = amount.saturating_add(1).min(MAX_PURGE);
 
-    if let Some(p) = msg.member.as_ref().and_then(|m| m.permissions) {
-        let user_has_manage_messages =
-            p.contains(Permissions::MANAGE_MESSAGES) || p.contains(Permissions::ADMINISTRATOR);
-
-        if !user_has_manage_messages {
-            http.create_message(msg.channel_id)
-                .content("You are not permitted to use this command.")
-                .await?;
-            return Ok(());
-        }
+    if !has_message_permission(http, &msg, Permissions::MANAGE_MESSAGES).await? {
+        http.create_message(msg.channel_id)
+            .content("You are not permitted to use this command.")
+            .await?;
+        return Ok(());
     }
 
     let messages = http
@@ -81,7 +74,8 @@ pub async fn run(
         http.delete_messages(msg.channel_id, &ids).await
     };
 
-    if delete_result.is_err() {
+    if let Err(source) = delete_result {
+        error!(?source, "purge delete request failed");
         http.create_message(msg.channel_id)
             .content("I couldn't delete messages. I likely need the 'Manage Messages' permission.")
             .await?;
