@@ -10,9 +10,9 @@ use twilight_model::{
 };
 
 use crate::commands::CommandMeta;
-use crate::services::moderation::send_moderation_action_embed;
-use crate::services::parse::{parse_duration_seconds, parse_target_user_id};
-use crate::services::permissions::has_message_permission;
+use crate::commands::moderation::embeds::{fetch_target_profile, moderation_action_embed};
+use crate::util::parse::{parse_duration_seconds, parse_target_user_id};
+use crate::util::permissions::has_message_permission;
 
 pub const META: CommandMeta = CommandMeta {
     name: "timeout",
@@ -106,15 +106,15 @@ pub async fn run(
         return Ok(());
     }
 
-    send_moderation_action_embed(
-        &http,
-        msg.channel_id,
+    let target_profile = fetch_target_profile(&http, target_user_id).await;
+    let embed = moderation_action_embed(
+        &target_profile,
         target_user_id,
         "timed out",
         reason,
         Some(&duration_label),
-    )
-    .await?;
+    )?;
+    http.create_message(msg.channel_id).embeds(&[embed]).await?;
 
     Ok(())
 }

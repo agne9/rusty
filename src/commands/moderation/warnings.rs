@@ -9,10 +9,10 @@ use twilight_model::{
 use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, ImageSource};
 
 use crate::commands::CommandMeta;
-use crate::embed::embed::DEFAULT_EMBED_COLOR;
-use crate::services::parse::parse_target_user_id;
-use crate::services::permissions::has_message_permission;
-use crate::services::warnings::{now_unix_secs, warnings_since};
+use crate::database::warnings::{now_unix_secs, warnings_since};
+use crate::util::embed::DEFAULT_EMBED_COLOR;
+use crate::util::parse::parse_target_user_id;
+use crate::util::permissions::has_message_permission;
 
 pub const META: CommandMeta = CommandMeta {
     name: "warnings",

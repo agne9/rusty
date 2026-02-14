@@ -3,7 +3,7 @@ use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, MessageCreate};
 
 use crate::commands::{COMMANDS, CommandMeta};
-use crate::embed::pagination::{
+use crate::util::pagination::{
     DEFAULT_TIMEOUT_SECS, PaginationInteractionValidation, PaginationModalSubmitValidation,
     build_paginated_view, build_paginated_view_with_footer_note, clamp_page,
     open_jump_modal_from_token, page_window, resolve_modal_target_page, send_paginated_message,

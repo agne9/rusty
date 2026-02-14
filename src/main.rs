@@ -8,8 +8,8 @@ use twilight_model::gateway::event::Event;
 use rustls::crypto::ring::default_provider;
 
 mod commands;
-mod embed;
-mod services;
+mod database;
+mod util;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

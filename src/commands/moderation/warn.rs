@@ -4,10 +4,10 @@ use twilight_http::Client;
 use twilight_model::{gateway::payload::incoming::MessageCreate, guild::Permissions};
 
 use crate::commands::CommandMeta;
-use crate::services::moderation::send_moderation_action_embed;
-use crate::services::parse::parse_target_user_id;
-use crate::services::permissions::has_message_permission;
-use crate::services::warnings::record_warning;
+use crate::commands::moderation::embeds::{fetch_target_profile, moderation_action_embed};
+use crate::database::warnings::record_warning;
+use crate::util::parse::parse_target_user_id;
+use crate::util::permissions::has_message_permission;
 
 pub const META: CommandMeta = CommandMeta {
     name: "warn",
@@ -52,15 +52,10 @@ pub async fn run(
     let warning = record_warning(target_user_id, msg.author.id, reason).await;
     let action = format!("warned #{}", warning.warn_number);
 
-    send_moderation_action_embed(
-        &http,
-        msg.channel_id,
-        target_user_id,
-        &action,
-        Some(reason),
-        None,
-    )
-    .await?;
+    let target_profile = fetch_target_profile(&http, target_user_id).await;
+    let embed =
+        moderation_action_embed(&target_profile, target_user_id, &action, Some(reason), None)?;
+    http.create_message(msg.channel_id).embeds(&[embed]).await?;
 
     Ok(())
 }
