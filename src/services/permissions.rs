@@ -51,3 +51,18 @@ pub async fn resolve_message_author_permissions(
 
     Ok(Some(resolved))
 }
+
+/// Check whether the message author has a required permission (or administrator).
+///
+/// Returns `Ok(false)` when the message is outside a guild context.
+pub async fn has_message_permission(
+    http: &Client,
+    msg: &MessageCreate,
+    required: Permissions,
+) -> anyhow::Result<bool> {
+    let Some(perms) = resolve_message_author_permissions(http, msg).await? else {
+        return Ok(false);
+    };
+
+    Ok(perms.contains(Permissions::ADMINISTRATOR) || perms.contains(required))
+}

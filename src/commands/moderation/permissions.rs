@@ -14,7 +14,7 @@ use crate::services::permissions::{permission_names, resolve_message_author_perm
 
 pub const META: CommandMeta = CommandMeta {
     name: "permissions",
-    desc: "Display your server permissions (paginated).",
+    desc: "Display your server permissions.",
     category: "moderation",
     usage: "!permissions [page]",
 };

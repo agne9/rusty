@@ -18,6 +18,8 @@ pub const META: CommandMeta = CommandMeta {
     usage: "!help [page|category]",
 };
 
+const HELP_COMMANDS_PER_PAGE: usize = 20;
+
 pub async fn run(
     http: Arc<Client>,
     msg: Box<MessageCreate>,
@@ -65,7 +67,7 @@ pub async fn run(
     }
 
     let requested_page = parsed_page.unwrap_or(1);
-    let total = total_pages(commands.len(), HELP_PER_PAGE);
+    let total = total_pages(commands.len(), HELP_COMMANDS_PER_PAGE);
 
     if requested_page > total {
         let out = format!(
@@ -76,7 +78,7 @@ pub async fn run(
         return Ok(());
     }
 
-    let (start, end) = page_window(commands.len(), HELP_PER_PAGE, requested_page);
+    let (start, end) = page_window(commands.len(), HELP_COMMANDS_PER_PAGE, requested_page);
     let description = grouped_help_description(&commands[start..end]);
     let pagination_command = help_pagination_command(category);
     let title = help_title();
@@ -117,8 +119,6 @@ pub async fn run(
     Ok(())
 }
 
-const HELP_PER_PAGE: usize = 6;
-
 /// Handle pagination button presses for the `help` command.
 pub async fn handle_pagination_interaction(
     http: Arc<Client>,
@@ -140,7 +140,7 @@ pub async fn handle_pagination_interaction(
         return Ok(true);
     }
 
-    let total = total_pages(commands.len(), HELP_PER_PAGE);
+    let total = total_pages(commands.len(), HELP_COMMANDS_PER_PAGE);
 
     if token.action == "jump" {
         open_jump_modal_from_token(&http, &interaction, &token, total).await?;
@@ -149,7 +149,7 @@ pub async fn handle_pagination_interaction(
 
     let target_page = clamp_page(token.page, total);
 
-    let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
+    let (start, end) = page_window(commands.len(), HELP_COMMANDS_PER_PAGE, target_page);
     let description = grouped_help_description(&commands[start..end]);
     let title = help_title();
     let footer_note = help_footer_note();
@@ -212,10 +212,10 @@ pub async fn handle_pagination_modal_interaction(
         return Ok(true);
     }
 
-    let total: usize = total_pages(commands.len(), HELP_PER_PAGE);
+    let total: usize = total_pages(commands.len(), HELP_COMMANDS_PER_PAGE);
     let target_page = resolve_modal_target_page(entered_page, total, total_pages_hint);
 
-    let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
+    let (start, end) = page_window(commands.len(), HELP_COMMANDS_PER_PAGE, target_page);
     let description = grouped_help_description(&commands[start..end]);
     let title = help_title();
     let footer_note = help_footer_note();

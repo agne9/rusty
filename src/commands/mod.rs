@@ -47,6 +47,12 @@ pub const COMMANDS: &[CommandMeta] = &[
     utility::help::META,
     utility::usage::META,
     utility::pagetest::META,
+    moderation::ban::META,
+    moderation::unban::META,
+    moderation::kick::META,
+    moderation::timeout::META,
+    moderation::untimeout::META,
+    moderation::warn::META,
     moderation::purge::META,
     moderation::permissions::META,
     // Add new commands here
@@ -59,23 +65,55 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
         return Ok(());
     }
 
-    if !msg.content.starts_with(PREFIX) {
+    let content_owned = msg.content.clone();
+    let content = content_owned.trim();
+
+    if !content.starts_with(PREFIX) {
         return Ok(());
     }
 
-    let content = msg.content.to_ascii_lowercase();
-    let mut parts = content.split_whitespace(); // Split msg into parts based on it's whitespaces
-    let raw = parts.next().unwrap_or(""); // Take the first piece (command), or empty string if missing
-    let cmd = raw.trim_start_matches('!'); // Remove prefix
-    let arg1 = parts.next(); // Take first arg after command
+    let content = content.trim_start_matches(PREFIX).trim();
+    let mut command_and_rest = content.splitn(2, char::is_whitespace);
+    let cmd = command_and_rest.next().unwrap_or("").to_ascii_lowercase();
+    let rest = command_and_rest
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
 
-    match cmd {
+    let (arg1, arg_tail): (Option<String>, Option<String>) = match rest {
+        Some(value) => {
+            let mut args = value.splitn(2, char::is_whitespace);
+            let first = args
+                .next()
+                .filter(|arg| !arg.is_empty())
+                .map(ToOwned::to_owned);
+            let tail = args
+                .next()
+                .map(str::trim)
+                .filter(|remaining| !remaining.is_empty())
+                .map(ToOwned::to_owned);
+
+            (first, tail)
+        }
+        None => (None, None),
+    };
+
+    let arg1 = arg1.as_deref();
+    let arg_tail = arg_tail.as_deref();
+
+    match cmd.as_str() {
         "ping" => utility::ping::run(http, msg).await?,
         "universe" => utility::universe::run(http, msg).await?,
         "help" => utility::help::run(http, msg, arg1).await?,
         "usage" => utility::usage::run(http, msg, arg1).await?,
         "pagetest" => utility::pagetest::run(http, msg, arg1).await?,
 
+        "ban" => moderation::ban::run(http, msg, arg1, arg_tail).await?,
+        "unban" => moderation::unban::run(http, msg, arg1, arg_tail).await?,
+        "kick" => moderation::kick::run(http, msg, arg1, arg_tail).await?,
+        "timeout" => moderation::timeout::run(http, msg, arg1, arg_tail).await?,
+        "untimeout" => moderation::untimeout::run(http, msg, arg1, arg_tail).await?,
+        "warn" => moderation::warn::run(http, msg, arg1, arg_tail).await?,
         "permissions" => moderation::permissions::run(http, msg, arg1).await?,
         "purge" => moderation::purge::run(http, msg, arg1).await?,
         // Add new commands here

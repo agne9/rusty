@@ -1,2 +1,8 @@
+pub mod ban;
+pub mod kick;
 pub mod permissions;
 pub mod purge;
+pub mod timeout;
+pub mod unban;
+pub mod untimeout;
+pub mod warn;

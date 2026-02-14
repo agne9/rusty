@@ -14,7 +14,7 @@ use crate::embed::pagination::{
 
 pub const META: CommandMeta = CommandMeta {
     name: "pagetest",
-    desc: "Temporary command to test embed pagination behavior.",
+    desc: "Test embed pagination behavior.",
     category: "utility",
     usage: "!pagetest [page]",
 };
