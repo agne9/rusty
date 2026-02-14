@@ -5,6 +5,7 @@ use twilight_http::request::AuditLogReason as _;
 use twilight_model::{gateway::payload::incoming::MessageCreate, guild::Permissions};
 
 use crate::commands::CommandMeta;
+use crate::services::moderation::send_moderation_action_embed;
 use crate::services::parse::parse_target_user_id;
 use crate::services::permissions::has_message_permission;
 
@@ -61,8 +62,15 @@ pub async fn run(
         return Ok(());
     }
 
-    let out = format!("Removed timeout from <@{}>.", target_user_id.get());
-    http.create_message(msg.channel_id).content(&out).await?;
+    send_moderation_action_embed(
+        &http,
+        msg.channel_id,
+        target_user_id,
+        "untimed out",
+        arg_tail,
+        None,
+    )
+    .await?;
 
     Ok(())
 }

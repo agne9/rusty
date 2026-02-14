@@ -4,8 +4,10 @@ use twilight_http::Client;
 use twilight_model::{gateway::payload::incoming::MessageCreate, guild::Permissions};
 
 use crate::commands::CommandMeta;
+use crate::services::moderation::send_moderation_action_embed;
 use crate::services::parse::parse_target_user_id;
 use crate::services::permissions::has_message_permission;
+use crate::services::warnings::record_warning;
 
 pub const META: CommandMeta = CommandMeta {
     name: "warn",
@@ -46,11 +48,20 @@ pub async fn run(
         return Ok(());
     };
 
-    let out = match arg_tail {
-        Some(reason) => format!("Warned <@{}>. Reason: {}", target_user_id.get(), reason),
-        None => format!("Warned <@{}>.", target_user_id.get()),
-    };
-    http.create_message(msg.channel_id).content(&out).await?;
+    let reason = arg_tail.unwrap_or("No reason provided");
+    let warning = record_warning(target_user_id, msg.author.id, reason).await;
+    let action = format!("warned #{}", warning.warn_number);
+    let reason_with_timestamp = format!("{}\nTimestamp: <t:{}:F>", reason, warning.warned_at);
+
+    send_moderation_action_embed(
+        &http,
+        msg.channel_id,
+        target_user_id,
+        &action,
+        Some(&reason_with_timestamp),
+        None,
+    )
+    .await?;
 
     Ok(())
 }

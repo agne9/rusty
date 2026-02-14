@@ -53,6 +53,7 @@ pub const COMMANDS: &[CommandMeta] = &[
     moderation::timeout::META,
     moderation::untimeout::META,
     moderation::warn::META,
+    moderation::warnings::META,
     moderation::purge::META,
     moderation::permissions::META,
     // Add new commands here
@@ -114,6 +115,7 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
         "timeout" => moderation::timeout::run(http, msg, arg1, arg_tail).await?,
         "untimeout" => moderation::untimeout::run(http, msg, arg1, arg_tail).await?,
         "warn" => moderation::warn::run(http, msg, arg1, arg_tail).await?,
+        "warnings" => moderation::warnings::run(http, msg, arg1, arg_tail).await?,
         "permissions" => moderation::permissions::run(http, msg, arg1).await?,
         "purge" => moderation::purge::run(http, msg, arg1).await?,
         // Add new commands here

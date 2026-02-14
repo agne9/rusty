@@ -10,6 +10,7 @@ use twilight_model::{
 };
 
 use crate::commands::CommandMeta;
+use crate::services::moderation::send_moderation_action_embed;
 use crate::services::parse::{parse_duration_seconds, parse_target_user_id};
 use crate::services::permissions::has_message_permission;
 
@@ -61,7 +62,7 @@ pub async fn run(
         return Ok(());
     }
 
-    let (duration_secs, reason) = match arg_tail {
+    let (duration_secs, duration_label, reason) = match arg_tail {
         Some(tail) => {
             let mut parts = tail.splitn(2, char::is_whitespace);
             let first = parts.next().unwrap_or("");
@@ -70,12 +71,12 @@ pub async fn run(
                     .next()
                     .map(str::trim)
                     .filter(|value| !value.is_empty());
-                (parsed_duration, parsed_reason)
+                (parsed_duration, first.to_owned(), parsed_reason)
             } else {
-                (DEFAULT_TIMEOUT_SECS, Some(tail))
+                (DEFAULT_TIMEOUT_SECS, "10m".to_owned(), Some(tail))
             }
         }
-        None => (DEFAULT_TIMEOUT_SECS, None),
+        None => (DEFAULT_TIMEOUT_SECS, "10m".to_owned(), None),
     };
 
     let expires_at_secs = SystemTime::now()
@@ -105,12 +106,15 @@ pub async fn run(
         return Ok(());
     }
 
-    let out = format!(
-        "Timed out <@{}> for {} seconds.",
-        target_user_id.get(),
-        duration_secs
-    );
-    http.create_message(msg.channel_id).content(&out).await?;
+    send_moderation_action_embed(
+        &http,
+        msg.channel_id,
+        target_user_id,
+        "timed out",
+        reason,
+        Some(&duration_label),
+    )
+    .await?;
 
     Ok(())
 }

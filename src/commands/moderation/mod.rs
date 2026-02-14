@@ -6,3 +6,4 @@ pub mod timeout;
 pub mod unban;
 pub mod untimeout;
 pub mod warn;
+pub mod warnings;

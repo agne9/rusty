@@ -1,5 +1,7 @@
 use twilight_model::channel::message::embed::Embed;
-use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
+use twilight_util::builder::embed::{
+    EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder, ImageSource,
+};
 
 /// Default embed color used across the bot UI.
 pub const DEFAULT_EMBED_COLOR: u32 = 0x90_54_30;
@@ -50,4 +52,32 @@ pub fn build_paginated_embed_with_footer_note(
     };
 
     Ok(embed)
+}
+
+/// Build a standardized moderation-result embed.
+pub fn build_moderation_action_embed(
+    header: &str,
+    reason: &str,
+    duration: Option<&str>,
+    icon_url: Option<&str>,
+) -> anyhow::Result<Embed> {
+    let description = match duration {
+        Some(duration) => format!("Reason: {}\nDuration: {}", reason, duration),
+        None => format!("Reason: {}", reason),
+    };
+
+    let builder = EmbedBuilder::new()
+        .color(DEFAULT_EMBED_COLOR)
+        .description(description);
+
+    let builder = match icon_url {
+        Some(url) => {
+            let icon = ImageSource::url(url.to_owned())?;
+            let author = EmbedAuthorBuilder::new(header).icon_url(icon).build();
+            builder.author(author)
+        }
+        None => builder.title(header),
+    };
+
+    Ok(builder.validate()?.build())
 }
