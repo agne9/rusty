@@ -14,6 +14,10 @@ pub fn build_nav_components(
     user_id: u64,
     timeout_secs: u64,
 ) -> Vec<Component> {
+    if total_pages <= 1 {
+        return vec![];
+    }
+
     let expires_at = now_unix_secs().saturating_add(timeout_secs);
 
     let prev_page = if current_page > 1 {
@@ -64,10 +68,29 @@ pub fn build_nav_components(
         sku_id: None,
     };
 
+    let jump_button = Button {
+        id: None,
+        custom_id: Some(build_custom_id(
+            command,
+            "jump",
+            current_page,
+            total_pages,
+            user_id,
+            expires_at,
+        )),
+        disabled: false,
+        emoji: None,
+        label: Some("*".to_owned()),
+        style: ButtonStyle::Secondary,
+        url: None,
+        sku_id: None,
+    };
+
     vec![Component::ActionRow(ActionRow {
         id: None,
         components: vec![
             Component::Button(prev_button),
+            Component::Button(jump_button),
             Component::Button(next_button),
         ],
     })]

@@ -10,6 +10,20 @@ pub fn clamp_page(page: usize, total_pages: usize) -> usize {
     page.clamp(1, total_pages.max(1))
 }
 
+/// Resolve a modal-entered page using the modal's total-pages hint.
+///
+/// The hint can become stale if data changed after the modal opened.
+/// This function safely bounds the target page to both the current total
+/// and the hint range seen by the user.
+pub fn resolve_modal_target_page(
+    entered_page: usize,
+    current_total_pages: usize,
+    hinted_total_pages: usize,
+) -> usize {
+    let max_allowed_page = std::cmp::min(current_total_pages, std::cmp::max(hinted_total_pages, 1));
+    clamp_page(entered_page, max_allowed_page)
+}
+
 /// Return start/end indices for a page window.
 pub fn page_window(total_items: usize, per_page: usize, page: usize) -> (usize, usize) {
     let safe_per_page = per_page.max(1);

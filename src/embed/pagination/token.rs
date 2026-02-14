@@ -3,6 +3,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const TOKEN_PREFIX: &str = "pg";
+const MODAL_TOKEN_PREFIX: &str = "pgm";
 
 /// Parsed pagination token data from a button custom ID.
 #[derive(Debug, Clone)]
@@ -14,6 +15,19 @@ pub struct PaginationToken {
     /// Target page number, 1-based.
     pub page: usize,
     /// Total page count.
+    pub total_pages: usize,
+    /// User ID that owns this pagination session.
+    pub user_id: u64,
+    /// Expiry timestamp (unix seconds).
+    pub expires_at: u64,
+}
+
+/// Parsed pagination jump-modal token data from a modal custom ID.
+#[derive(Debug, Clone)]
+pub struct PaginationModalToken {
+    /// Logical command name (e.g. `permissions` or `help|utility`).
+    pub command: String,
+    /// Total page count at modal-open time.
     pub total_pages: usize,
     /// User ID that owns this pagination session.
     pub user_id: u64,
@@ -89,7 +103,7 @@ pub fn validate_custom_id(
         return Err(PaginationValidationError::WrongUser);
     }
 
-    if token.action != "prev" && token.action != "next" {
+    if token.action != "prev" && token.action != "next" && token.action != "jump" {
         return Err(PaginationValidationError::Invalid);
     }
 
@@ -102,6 +116,47 @@ pub fn validate_custom_id(
     }
 
     Ok(token)
+}
+
+/// Build a modal custom ID carrying pagination session state.
+pub fn build_modal_custom_id(
+    command: &str,
+    total_pages: usize,
+    user_id: u64,
+    expires_at: u64,
+) -> String {
+    format!("{MODAL_TOKEN_PREFIX}:{command}:{total_pages}:{user_id}:{expires_at}")
+}
+
+/// Parse a pagination modal custom ID.
+pub fn parse_modal_custom_id(custom_id: &str) -> Option<PaginationModalToken> {
+    let mut parts = custom_id.split(':');
+
+    let prefix = parts.next()?;
+    if prefix != MODAL_TOKEN_PREFIX {
+        return None;
+    }
+
+    let command = parts.next()?.to_owned();
+    let total_pages = parts.next()?.parse::<usize>().ok()?;
+    let user_id = parts.next()?.parse::<u64>().ok()?;
+    let expires_at = parts.next()?.parse::<u64>().ok()?;
+
+    if parts.next().is_some() {
+        return None;
+    }
+
+    Some(PaginationModalToken {
+        command,
+        total_pages,
+        user_id,
+        expires_at,
+    })
+}
+
+/// Whether the provided unix timestamp is already expired.
+pub fn is_expired(expires_at: u64) -> bool {
+    now_unix_secs() > expires_at
 }
 
 fn now_unix_secs() -> u64 {

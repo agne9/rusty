@@ -19,6 +19,7 @@ pub const COMMANDS: &[CommandMeta] = &[
     utility::ping::META,
     utility::universe::META,
     utility::help::META,
+    utility::pagetest::META,
     moderation::purge::META,
     moderation::permissions::META,
     // Add new commands here
@@ -45,6 +46,7 @@ pub async fn handle_message(http: Arc<Client>, msg: Box<MessageCreate>) -> anyho
         "ping" => utility::ping::run(http, msg).await?,
         "universe" => utility::universe::run(http, msg).await?,
         "help" => utility::help::run(http, msg, arg1).await?,
+        "pagetest" => utility::pagetest::run(http, msg, arg1).await?,
 
         "permissions" => moderation::permissions::run(http, msg, arg1).await?,
         "purge" => moderation::purge::run(http, msg, arg1).await?,
@@ -61,14 +63,26 @@ pub async fn handle_interaction(
 ) -> anyhow::Result<()> {
     let custom_id = match interaction.data.as_ref() {
         Some(InteractionData::MessageComponent(data)) => data.custom_id.clone(),
+        Some(InteractionData::ModalSubmit(data)) => data.custom_id.clone(),
         _ => return Ok(()),
     };
 
     if custom_id.starts_with("pg:permissions:") {
         let _handled =
             moderation::permissions::handle_pagination_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pg:help:") {
+    } else if custom_id.starts_with("pg:help") {
         let _handled = utility::help::handle_pagination_interaction(http, interaction).await?;
+    } else if custom_id.starts_with("pg:pagetest:") {
+        let _handled = utility::pagetest::handle_pagination_interaction(http, interaction).await?;
+    } else if custom_id.starts_with("pgm:permissions:") {
+        let _handled =
+            moderation::permissions::handle_pagination_modal_interaction(http, interaction).await?;
+    } else if custom_id.starts_with("pgm:help") {
+        let _handled =
+            utility::help::handle_pagination_modal_interaction(http, interaction).await?;
+    } else if custom_id.starts_with("pgm:pagetest:") {
+        let _handled =
+            utility::pagetest::handle_pagination_modal_interaction(http, interaction).await?;
     }
 
     Ok(())

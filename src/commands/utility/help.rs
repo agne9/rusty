@@ -3,10 +3,12 @@ use twilight_http::Client;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, MessageCreate};
 
 use crate::commands::{COMMANDS, CommandMeta};
-use crate::ui::pagination::{
-    DEFAULT_TIMEOUT_SECS, PaginationInteractionValidation, build_paginated_view,
-    build_paginated_view_with_footer_note, clamp_page, page_window, respond_update_message,
-    total_pages, validate_interaction_for_command_prefix,
+use crate::embed::pagination::{
+    DEFAULT_TIMEOUT_SECS, PaginationInteractionValidation, PaginationModalSubmitValidation,
+    build_paginated_view, build_paginated_view_with_footer_note, clamp_page,
+    open_jump_modal_from_token, page_window, resolve_modal_target_page, send_paginated_message,
+    total_pages, update_paginated_interaction_message, validate_interaction_for_command_prefix,
+    validate_jump_modal_for_command_prefix,
 };
 
 pub const META: CommandMeta = CommandMeta {
@@ -101,10 +103,15 @@ pub async fn run(
         )?,
     };
 
-    http.create_message(msg.channel_id)
-        .embeds(&[embed])
-        .components(&components)
-        .await?;
+    send_paginated_message(
+        Arc::clone(&http),
+        msg.channel_id,
+        embed,
+        components,
+        total,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await?;
 
     Ok(())
 }
@@ -133,6 +140,12 @@ pub async fn handle_pagination_interaction(
     }
 
     let total = total_pages(commands.len(), HELP_PER_PAGE);
+
+    if token.action == "jump" {
+        open_jump_modal_from_token(&http, &interaction, &token, total).await?;
+        return Ok(true);
+    }
+
     let target_page = clamp_page(token.page, total);
 
     let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
@@ -162,7 +175,81 @@ pub async fn handle_pagination_interaction(
         )?,
     };
 
-    respond_update_message(&http, &interaction, &[embed], &components).await?;
+    update_paginated_interaction_message(
+        Arc::clone(&http),
+        &interaction,
+        embed,
+        components,
+        total,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await?;
+
+    Ok(true)
+}
+
+/// Handle jump-modal submit interactions for the `help` command.
+pub async fn handle_pagination_modal_interaction(
+    http: Arc<Client>,
+    interaction: Box<InteractionCreate>,
+) -> anyhow::Result<bool> {
+    let (actor_id, command, entered_page, total_pages_hint) =
+        match validate_jump_modal_for_command_prefix(&http, &interaction, "help").await? {
+            PaginationModalSubmitValidation::NotForCommand => return Ok(false),
+            PaginationModalSubmitValidation::HandledInvalid => return Ok(true),
+            PaginationModalSubmitValidation::Valid {
+                actor_user_id,
+                command,
+                requested_page,
+                total_pages_hint,
+            } => (actor_user_id, command, requested_page, total_pages_hint),
+        };
+
+    let category = category_from_pagination_command(&command);
+    let commands = sorted_commands(category.as_deref());
+    if commands.is_empty() {
+        return Ok(true);
+    }
+
+    let total: usize = total_pages(commands.len(), HELP_PER_PAGE);
+    let target_page = resolve_modal_target_page(entered_page, total, total_pages_hint);
+
+    let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
+    let description = grouped_help_description(&commands[start..end]);
+    let title = help_title(category.as_deref());
+    let footer_note = help_footer_note(category.as_deref());
+
+    let (embed, components) = match footer_note.as_deref() {
+        Some(note) => build_paginated_view_with_footer_note(
+            &command,
+            &title,
+            description,
+            target_page,
+            total,
+            actor_id,
+            DEFAULT_TIMEOUT_SECS,
+            Some(note),
+        )?,
+        None => build_paginated_view(
+            &command,
+            &title,
+            description,
+            target_page,
+            total,
+            actor_id,
+            DEFAULT_TIMEOUT_SECS,
+        )?,
+    };
+
+    update_paginated_interaction_message(
+        Arc::clone(&http),
+        &interaction,
+        embed,
+        components,
+        total,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await?;
 
     Ok(true)
 }
