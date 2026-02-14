@@ -16,6 +16,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "permissions",
     desc: "Display your server permissions (paginated).",
     category: "moderation",
+    usage: "!permissions [page]",
 };
 
 const PERMISSIONS_PER_PAGE: usize = 10;
@@ -53,9 +54,8 @@ pub async fn run(
 
     let total_pages = total_pages(names.len(), PERMISSIONS_PER_PAGE);
     let Some(requested_page) = parse_one_based_page(arg1) else {
-        http.create_message(msg.channel_id)
-            .content("Usage: !permissions [page], where page starts at 1.")
-            .await?;
+        let usage = format!("Usage: `{}` (page starts at 1)", META.usage);
+        http.create_message(msg.channel_id).content(&usage).await?;
         return Ok(());
     };
 

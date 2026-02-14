@@ -8,11 +8,37 @@ use twilight_model::{
     gateway::payload::incoming::{InteractionCreate, MessageCreate},
 };
 
+#[derive(Clone, Copy)]
+enum InteractionRoute {
+    PermissionsButtons,
+    HelpButtons,
+    PagetestButtons,
+    PermissionsModal,
+    HelpModal,
+    PagetestModal,
+}
+
+fn route_interaction(custom_id: &str) -> Option<InteractionRoute> {
+    const ROUTES: [(&str, InteractionRoute); 6] = [
+        ("pg:permissions:", InteractionRoute::PermissionsButtons),
+        ("pg:help", InteractionRoute::HelpButtons),
+        ("pg:pagetest:", InteractionRoute::PagetestButtons),
+        ("pgm:permissions:", InteractionRoute::PermissionsModal),
+        ("pgm:help", InteractionRoute::HelpModal),
+        ("pgm:pagetest:", InteractionRoute::PagetestModal),
+    ];
+
+    ROUTES
+        .into_iter()
+        .find_map(|(prefix, route)| custom_id.starts_with(prefix).then_some(route))
+}
+
 // Global command meta data
 pub struct CommandMeta {
     pub name: &'static str,
     pub desc: &'static str,
     pub category: &'static str,
+    pub usage: &'static str,
 }
 
 pub const COMMANDS: &[CommandMeta] = &[
@@ -67,22 +93,35 @@ pub async fn handle_interaction(
         _ => return Ok(()),
     };
 
-    if custom_id.starts_with("pg:permissions:") {
-        let _handled =
-            moderation::permissions::handle_pagination_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pg:help") {
-        let _handled = utility::help::handle_pagination_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pg:pagetest:") {
-        let _handled = utility::pagetest::handle_pagination_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pgm:permissions:") {
-        let _handled =
-            moderation::permissions::handle_pagination_modal_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pgm:help") {
-        let _handled =
-            utility::help::handle_pagination_modal_interaction(http, interaction).await?;
-    } else if custom_id.starts_with("pgm:pagetest:") {
-        let _handled =
-            utility::pagetest::handle_pagination_modal_interaction(http, interaction).await?;
+    let Some(route) = route_interaction(&custom_id) else {
+        return Ok(());
+    };
+
+    match route {
+        InteractionRoute::PermissionsButtons => {
+            let _handled =
+                moderation::permissions::handle_pagination_interaction(http, interaction).await?;
+        }
+        InteractionRoute::HelpButtons => {
+            let _handled = utility::help::handle_pagination_interaction(http, interaction).await?;
+        }
+        InteractionRoute::PagetestButtons => {
+            let _handled =
+                utility::pagetest::handle_pagination_interaction(http, interaction).await?;
+        }
+        InteractionRoute::PermissionsModal => {
+            let _handled =
+                moderation::permissions::handle_pagination_modal_interaction(http, interaction)
+                    .await?;
+        }
+        InteractionRoute::HelpModal => {
+            let _handled =
+                utility::help::handle_pagination_modal_interaction(http, interaction).await?;
+        }
+        InteractionRoute::PagetestModal => {
+            let _handled =
+                utility::pagetest::handle_pagination_modal_interaction(http, interaction).await?;
+        }
     }
 
     Ok(())

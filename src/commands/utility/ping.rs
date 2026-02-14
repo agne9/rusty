@@ -8,6 +8,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "ping",
     desc: "Replies with Pong!",
     category: "utility",
+    usage: "!ping",
 };
 
 pub async fn run(http: Arc<Client>, msg: Box<MessageCreate>) -> anyhow::Result<()> {

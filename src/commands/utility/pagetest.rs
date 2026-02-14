@@ -16,6 +16,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "pagetest",
     desc: "Temporary command to test embed pagination behavior.",
     category: "utility",
+    usage: "!pagetest [page]",
 };
 
 // TODO: Remove this temporary command after pagination verification is complete.
@@ -42,9 +43,8 @@ pub async fn run(
     let total = total_pages(items.len(), ITEMS_PER_PAGE);
 
     let Some(requested_page) = parse_one_based_page(arg1) else {
-        http.create_message(msg.channel_id)
-            .content("Usage: !pagetest [page], where page starts at 1.")
-            .await?;
+        let usage = format!("Usage: `{}` (page starts at 1)", META.usage);
+        http.create_message(msg.channel_id).content(&usage).await?;
         return Ok(());
     };
 

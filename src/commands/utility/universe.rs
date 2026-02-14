@@ -8,6 +8,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "universe",
     desc: "The answer to the universe.",
     category: "utility",
+    usage: "!universe",
 };
 
 pub async fn run(http: Arc<Client>, msg: Box<MessageCreate>) -> anyhow::Result<()> {

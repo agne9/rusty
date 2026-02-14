@@ -14,6 +14,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "purge",
     desc: "Delete the latest messages in this channel.",
     category: "moderation",
+    usage: "!purge <amount>",
 };
 
 const MAX_PURGE: u16 = 100;
@@ -24,9 +25,8 @@ pub async fn run(
     arg1: Option<&str>,
 ) -> anyhow::Result<()> {
     let Some(requested_raw) = arg1 else {
-        http.create_message(msg.channel_id)
-            .content("Usage: !purge <amount>")
-            .await?;
+        let usage = format!("Usage: `{}`", META.usage);
+        http.create_message(msg.channel_id).content(&usage).await?;
         return Ok(());
     };
 

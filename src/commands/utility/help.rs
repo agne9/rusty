@@ -15,6 +15,7 @@ pub const META: CommandMeta = CommandMeta {
     name: "help",
     desc: "Lists out all available commands.",
     category: "utility",
+    usage: "!help [page|category]",
 };
 
 pub async fn run(
@@ -78,8 +79,8 @@ pub async fn run(
     let (start, end) = page_window(commands.len(), HELP_PER_PAGE, requested_page);
     let description = grouped_help_description(&commands[start..end]);
     let pagination_command = help_pagination_command(category);
-    let title = help_title(category);
-    let footer_note = help_footer_note(category);
+    let title = help_title();
+    let footer_note = help_footer_note();
 
     let (embed, components) = match footer_note.as_deref() {
         Some(note) => build_paginated_view_with_footer_note(
@@ -150,8 +151,8 @@ pub async fn handle_pagination_interaction(
 
     let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
     let description = grouped_help_description(&commands[start..end]);
-    let title = help_title(category.as_deref());
-    let footer_note = help_footer_note(category.as_deref());
+    let title = help_title();
+    let footer_note = help_footer_note();
 
     let (embed, components) = match footer_note.as_deref() {
         Some(note) => build_paginated_view_with_footer_note(
@@ -216,8 +217,8 @@ pub async fn handle_pagination_modal_interaction(
 
     let (start, end) = page_window(commands.len(), HELP_PER_PAGE, target_page);
     let description = grouped_help_description(&commands[start..end]);
-    let title = help_title(category.as_deref());
-    let footer_note = help_footer_note(category.as_deref());
+    let title = help_title();
+    let footer_note = help_footer_note();
 
     let (embed, components) = match footer_note.as_deref() {
         Some(note) => build_paginated_view_with_footer_note(
@@ -265,15 +266,12 @@ fn category_from_pagination_command(command: &str) -> Option<String> {
     command.strip_prefix("help|").map(ToOwned::to_owned)
 }
 
-fn help_title(category: Option<&str>) -> String {
-    match category {
-        Some(cat) => format!("Available Commands • {}", display_category(cat)),
-        None => "Available Commands".to_owned(),
-    }
+fn help_title() -> String {
+    "Available Commands".to_owned()
 }
 
-fn help_footer_note(category: Option<&str>) -> Option<String> {
-    category.map(|cat| format!("Category: {}", display_category(cat)))
+fn help_footer_note() -> Option<String> {
+    None
 }
 
 fn display_category(category: &str) -> String {
@@ -315,7 +313,8 @@ fn grouped_help_description(commands: &[&CommandMeta]) -> String {
             current_category = Some(command.category);
         }
 
-        out.push_str(&format!("• !{} - {}\n", command.name, command.desc));
+        out.push_str(&format!("`{}`: {}\n", command.name, command.desc));
+        out.push_str(&format!("Usage: `{}`\n", command.usage));
     }
 
     if out.is_empty() {
